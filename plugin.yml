@@ -1,0 +1,15 @@
+name: ctf
+main: me.ctf.cblocksurprise.Main
+version: 1.0
+api-version: 1.14
+author: CBlockSurprise
+commands:
+  startgame:
+    description: This is for starting the game
+    usage: /<command>
+  stopgame:
+    description: This is for stopping the stopping the game
+    usage: /<command>
+  setteamsize:
+    description: Set the team size
+    usage: /<command>
