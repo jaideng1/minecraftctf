@@ -2,6 +2,7 @@ package me.ctf.cblocksurprise;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -14,14 +15,21 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType.SlotType;
+import org.bukkit.event.player.PlayerItemDamageEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import net.md_5.bungee.api.ChatColor;
 
@@ -33,6 +41,12 @@ public class Main extends JavaPlugin implements Listener{
 	
 	ItemStack blueChestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
 	ItemStack blueHelmet = new ItemStack(Material.LEATHER_HELMET);
+	
+	ItemStack redf = new ItemStack(Material.RED_BANNER);
+	ItemStack bluef = new ItemStack(Material.BLUE_BANNER);
+	
+	Material red = redf.getType();
+	Material blue = bluef.getType();
 	
 	@Override
 	public void onEnable() {
@@ -58,6 +72,19 @@ public class Main extends JavaPlugin implements Listener{
 		meta.setColor(Color.BLUE);
 		blueHelmet.setItemMeta(meta);
 		
+		ItemMeta itemMeta = redf.getItemMeta();
+		itemMeta.setDisplayName(ChatColor.RED + "Red Team's Flag");
+		ArrayList<String> lore = new ArrayList<String>();
+		lore.add("Get this to your team's base!");
+		itemMeta.setLore(lore);
+		redf.setItemMeta(itemMeta);
+		
+		itemMeta = bluef.getItemMeta();
+		itemMeta.setDisplayName(ChatColor.BLUE + "Blue Team's Flag");
+		lore = new ArrayList<String>();
+		lore.add("Get this to your team's base!");
+		itemMeta.setLore(lore);
+		bluef.setItemMeta(itemMeta);
 		
 		getServer().getPluginManager().registerEvents(this, this);
 	}
@@ -84,16 +111,24 @@ public class Main extends JavaPlugin implements Listener{
 			Player damaged = (Player) event.getEntity();
 			if (isPlaying && isCTFPlayer(damaged)) {
 				if (getPlayerTeam(damaged) != "") {
-					damaged.sendMessage(ChatColor.RED + "You've been hit! Your health: " + damaged.getHealth());
+					damaged.sendMessage(ChatColor.RED + "You've been hit! Your health: " + Math.floor(damaged.getHealth()));
 					if (damaged.getHealth() < 1) {
 						event.setCancelled(true);
-						damaged.setHealth(10);
+						damaged.setHealth(20);
+						damaged.teleport(deathCamp);
 						damaged.sendMessage(ChatColor.RED + "You've been sent to JAIL!");
 					}
 				} else {
 					event.setCancelled(true);
 				}
 			}
+		}
+	}
+	
+	@EventHandler
+	public void onPlayerItemDamage(PlayerItemDamageEvent event) {
+		if (isCTFPlayer(event.getPlayer())) {
+			event.setCancelled(true);
 		}
 	}
 	
@@ -114,6 +149,76 @@ public class Main extends JavaPlugin implements Listener{
 		if (isCTFPlayer(p) && isPlaying) {
 			event.setCancelled(true);
 		}
+	}
+	
+	@EventHandler
+	public void onBlockPlace(BlockPlaceEvent event) {
+		Player player = event.getPlayer();
+		
+		if (isCTFPlayer(player)) {
+			event.setCancelled(true);
+			//player.getInventory().addItem(new ItemStack(event.getBlockPlaced().getType()));
+		}
+	}
+	
+	@EventHandler
+	public void onBlockBreak(BlockBreakEvent event) {
+		if (isCTFPlayer(event.getPlayer())) {
+			if (event.getBlock().getType() == Material.RED_BANNER && getPlayerTeam(event.getPlayer()) == "BLUE") {
+				event.getBlock().setType(Material.AIR);
+				event.getPlayer().getInventory().addItem(redf);
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a subtitle {\"text\":\"BLUE has taken the RED flag\",\"color\":\"BLUE\"}");
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"!!!\",\"color\":\"blue\"}");
+			}
+			if (event.getBlock().getType() == Material.BLUE_BANNER && getPlayerTeam(event.getPlayer()) == "RED") {
+				event.getBlock().setType(Material.AIR);
+				event.getPlayer().getInventory().addItem(bluef);
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a subtitle {\"text\":\"RED has taken the BLUE flag\",\"color\":\"red\"}");
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"!!!\",\"color\":\"red\"}");
+			}
+			event.setCancelled(true);
+		}
+	}
+	
+	@EventHandler
+	public void onPlayerMove(PlayerMoveEvent event) {
+		Location point1blue = new Location(_world, -456, 68, -2);
+		Location point2blue = new Location(_world,-450, 78, -8);
+		Location point1red = new Location(_world,-456, 68, -74);
+		Location point2red = new Location(_world,-450,78,-81);
+		if (isInRect(event.getPlayer(), point1red, point2red) && isCTFPlayer(event.getPlayer()) && getPlayerTeam(event.getPlayer()) == "RED") {
+			event.getPlayer().teleport(redBase);
+			event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area!");
+		}
+		if (isInRect(event.getPlayer(), point1blue, point2blue) && isCTFPlayer(event.getPlayer()) && getPlayerTeam(event.getPlayer()) == "BLUE") {
+			event.getPlayer().teleport(blueBase);
+			event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area!");
+		}
+	}
+	
+	public boolean isInRect(Player player, Location loc1, Location loc2)
+	{
+	    double[] dim = new double[2];
+	 
+	    dim[0] = loc1.getX();
+	    dim[1] = loc2.getX();
+	    Arrays.sort(dim);
+	    if(player.getLocation().getX() > dim[1] || player.getLocation().getX() < dim[0])
+	        return false;
+	 
+	    dim[0] = loc1.getZ();
+	    dim[1] = loc2.getZ();
+	    Arrays.sort(dim);
+	    if(player.getLocation().getZ() > dim[1] || player.getLocation().getZ() < dim[0])
+	        return false;
+	    
+	    dim[0] = loc1.getY();
+	    dim[1] = loc2.getY();
+	    Arrays.sort(dim);
+	    if(player.getLocation().getY() > dim[1] || player.getLocation().getY() < dim[0])
+	        return false;
+	 	 
+	    return true;
 	}
 	
 	public boolean isCTFPlayer(Player p) {
@@ -148,11 +253,11 @@ public class Main extends JavaPlugin implements Listener{
 	
 	World _world = Bukkit.getWorlds().get(0);
 	
-	Location redBase = new Location(_world,-478.5,68,-105.5);
-	Location redFlag = new Location(_world,-471.5,69,-105.5);
-	Location blueBase = new Location(_world,-478.5,68,-4.5);
-	Location blueFlag = new Location(_world,-470.5,69,-4.5);
-	Location deathCamp = new Location(_world,-465.5,69,4.5);
+	Location redBase = new Location(_world,-460.5,68,-78.5);
+	Location redFlag = new Location(_world,-453.5,69,-78.5);
+	Location blueBase = new Location(_world,-460.5,68,-4.5);
+	Location blueFlag = new Location(_world,-453.5,69,-4.5);
+	Location deathCamp = new Location(_world,-451.5,74,6.5);
 	
 	//ArrayList<Location> spawnItemNodes = new ArrayList<Location>();
 	
@@ -165,10 +270,19 @@ public class Main extends JavaPlugin implements Listener{
 				if (i % 2 == 0) {
 					redTeam.add(p);
 					p.teleport(redBase);
+					p.getInventory().setChestplate(redChestplate);
+					p.getInventory().setHelmet(redHelmet);
+					
 				} else {
 					blueTeam.add(p);
 					p.teleport(blueBase);
+					p.getInventory().setChestplate(blueChestplate);
+					p.getInventory().setHelmet(blueHelmet);
 				}
+				p.setHealth(20);
+				p.setFoodLevel(20);
+				PotionEffect haste = new PotionEffect(PotionEffectType.FAST_DIGGING,75000,255);
+				p.addPotionEffect(haste);
 				p.setGameMode(GameMode.SURVIVAL);
 			}
 			i++;
@@ -203,6 +317,7 @@ public class Main extends JavaPlugin implements Listener{
 					player.performCommand("title @a title {\"text\":\"Stopping Game\",\"color\":\"red\"}");
 					redTeam = new ArrayList<Player>();
 					blueTeam = new ArrayList<Player>();
+					isPlaying = false;
 				} else {
 					player.sendMessage(ChatColor.RED + "There is not a game active right now.");
 				}
