@@ -5,7 +5,10 @@ import java.util.ArrayList;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -77,20 +80,19 @@ public class Main extends JavaPlugin implements Listener{
 	@EventHandler
 	public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
 		
-		if (event.getEntity() instanceof Player /*&& event.getDamager() instanceof Player*/) { //Change
+		if (event.getEntity() instanceof Player) { //Change
 			Player damaged = (Player) event.getEntity();
-			//Player damager = (Player) event.getDamager(); chammge
-			if (isPlaying && isCTFPlayer(damaged) /*&& isCTFPlayer(damager)*/) {
-				//if (getPlayerTeam(damaged) != getPlayerTeam(damager)) {
+			if (isPlaying && isCTFPlayer(damaged)) {
+				if (getPlayerTeam(damaged) != "") {
 					damaged.sendMessage(ChatColor.RED + "You've been hit! Your health: " + damaged.getHealth());
 					if (damaged.getHealth() < 1) {
 						event.setCancelled(true);
 						damaged.setHealth(10);
 						damaged.sendMessage(ChatColor.RED + "You've been sent to JAIL!");
 					}
-//				} else {
-//					event.setCancelled(true);
-//				}
+				} else {
+					event.setCancelled(true);
+				}
 			}
 		}
 	}
@@ -144,6 +146,16 @@ public class Main extends JavaPlugin implements Listener{
 		return "";
 	}
 	
+	World _world = Bukkit.getWorlds().get(0);
+	
+	Location redBase = new Location(_world,-478.5,68,-105.5);
+	Location redFlag = new Location(_world,-471.5,69,-105.5);
+	Location blueBase = new Location(_world,-478.5,68,-4.5);
+	Location blueFlag = new Location(_world,-470.5,69,-4.5);
+	Location deathCamp = new Location(_world,-465.5,69,4.5);
+	
+	//ArrayList<Location> spawnItemNodes = new ArrayList<Location>();
+	
 	void makeTeams() {
 		int i = 0;
 		for (Player p : Bukkit.getOnlinePlayers()) {
@@ -152,9 +164,12 @@ public class Main extends JavaPlugin implements Listener{
 				p.getInventory().clear();
 				if (i % 2 == 0) {
 					redTeam.add(p);
+					p.teleport(redBase);
 				} else {
 					blueTeam.add(p);
+					p.teleport(blueBase);
 				}
+				p.setGameMode(GameMode.SURVIVAL);
 			}
 			i++;
 		}
