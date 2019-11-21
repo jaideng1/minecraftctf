@@ -12,7 +12,9 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -22,9 +24,12 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType.SlotType;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -167,7 +172,7 @@ public class Main extends JavaPlugin implements Listener{
 			if (event.getBlock().getType() == Material.RED_BANNER && getPlayerTeam(event.getPlayer()) == "BLUE") {
 				event.getBlock().setType(Material.AIR);
 				event.getPlayer().getInventory().addItem(redf);
-				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a subtitle {\"text\":\"BLUE has taken the RED flag\",\"color\":\"BLUE\"}");
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a subtitle {\"text\":\"BLUE has taken the RED flag\",\"color\":\"blue\"}");
 				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"!!!\",\"color\":\"blue\"}");
 			}
 			if (event.getBlock().getType() == Material.BLUE_BANNER && getPlayerTeam(event.getPlayer()) == "RED") {
@@ -188,11 +193,131 @@ public class Main extends JavaPlugin implements Listener{
 		Location point2red = new Location(_world,-450,78,-81);
 		if (isInRect(event.getPlayer(), point1red, point2red) && isCTFPlayer(event.getPlayer()) && getPlayerTeam(event.getPlayer()) == "RED") {
 			event.getPlayer().teleport(redBase);
-			event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area!");
+			if (!event.getPlayer().getInventory().getItemInMainHand().isSimilar(bluef)) {
+				event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area! If you have the flag, have it in your main hand!");
+				
+			} else {
+				reset();
+				Bukkit.broadcastMessage(ChatColor.DARK_RED + "The RED team has won!");
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"RED WON\",\"color\":\"red\"}");
+			}
+			
 		}
 		if (isInRect(event.getPlayer(), point1blue, point2blue) && isCTFPlayer(event.getPlayer()) && getPlayerTeam(event.getPlayer()) == "BLUE") {
 			event.getPlayer().teleport(blueBase);
-			event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area!");
+			if (!event.getPlayer().getInventory().getItemInMainHand().isSimilar(redf)) {
+				event.getPlayer().sendMessage(ChatColor.RED+"You can't enter this area! If you have the flag, have it in your main hand!");
+			} else {
+				reset();
+				Bukkit.broadcastMessage(ChatColor.DARK_BLUE + "The BLUE team has won!");
+				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"BLUE WON\",\"color\":\"blue\"}");
+			}
+		}
+	}
+	
+	Inventory null_shop = Bukkit.createInventory(null, 9, "Item Shop");
+	
+	@EventHandler
+	public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+		if (event.getRightClicked() instanceof Villager) {
+			if (isCTFPlayer(event.getPlayer())) {
+				event.setCancelled(true);
+				
+				ItemStack invis = new ItemStack(Material.POTION,1);
+				ItemMeta im = invis.getItemMeta();
+				im.setDisplayName("Invisibility (0:30)");
+				invis.setItemMeta(im);
+				
+				ItemStack strength = new ItemStack(Material.POTION,1);
+				ItemMeta sm = strength.getItemMeta();
+				im.setDisplayName("Strength (0:30)");
+				strength.setItemMeta(sm);
+				
+				ItemStack ench = new ItemStack(Material.ENCHANTED_BOOK,1);
+				EnchantmentStorageMeta em = (EnchantmentStorageMeta) ench.getItemMeta();
+				em.addEnchant(Enchantment.DAMAGE_ALL, 1, false);
+				em.addEnchant(Enchantment.THORNS, 1, false);
+				em.addEnchant(Enchantment.MULTISHOT, 1, false);
+				ench.setItemMeta(em);
+				
+				Inventory inv = Bukkit.createInventory(null, 9, "Item Shop");
+				inv.setItem(0, new ItemStack(Material.STONE_SWORD, 1));
+				inv.setItem(1, new ItemStack(Material.IRON_SWORD, 1));
+				inv.setItem(2, new ItemStack(Material.BOW, 1));
+				inv.setItem(3, new ItemStack(Material.ARROW, 8));
+				inv.setItem(4, invis); // TODO change the potions + enchanted book
+				inv.setItem(5, strength); //<- invis ^strength
+				inv.setItem(6, new ItemStack(Material.WHITE_WOOL, 16));
+				inv.setItem(7, new ItemStack(Material.ENDER_PEARL, 1));
+				inv.setItem(8, ench);
+				event.getPlayer().openInventory(inv);
+			}
+		}
+	}
+	
+	@EventHandler
+	public void onInventoryClickShop(InventoryClickEvent event) {
+		Player player = (Player) event.getWhoClicked(); 
+		ItemStack clicked = event.getCurrentItem();
+		
+		Inventory inventory = event.getInventory();
+		if (clicked == null) {return;}
+		if (inventory == null) {return;}
+		int two = null_shop.getSize();
+		int one = inventory.getSize();
+		
+		if (two == one) {
+			if (clicked.getType() == Material.STONE_SWORD) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.STONE_SWORD, 1));
+			}
+			if (clicked.getType() == Material.IRON_SWORD) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.IRON_SWORD, 1));
+			}
+			if (clicked.getType() == Material.BOW) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.BOW, 1));
+			}
+			if (clicked.getType() == Material.ARROW) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.ARROW, 8));
+			}
+			if (clicked.getType() == Material.POTION) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.POTION, 1));
+			}
+//			if (clicked.getType() == Material.POTION) { change for each potion
+//				event.setCancelled(true);
+//				player.closeInventory();
+//				player.getInventory().addItem(new ItemStack(Material.POTION, 1));
+//			}
+			if (clicked.getType() == Material.WHITE_WOOL) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.WHITE_WOOL, 16));
+			}
+			if (clicked.getType() == Material.ENDER_PEARL) {
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(new ItemStack(Material.ENDER_PEARL, 1));
+			}
+			if (clicked.getType() == Material.ENCHANTED_BOOK) {
+				ItemStack ench = new ItemStack(Material.ENCHANTED_BOOK,1);
+				EnchantmentStorageMeta em = (EnchantmentStorageMeta) ench.getItemMeta();
+				em.addEnchant(Enchantment.DAMAGE_ALL, 1, false);
+				em.addEnchant(Enchantment.THORNS, 1, false);
+				em.addEnchant(Enchantment.MULTISHOT, 1, false);
+				ench.setItemMeta(em);
+				event.setCancelled(true);
+				player.closeInventory();
+				player.getInventory().addItem(ench);
+			}
 		}
 	}
 	
@@ -254,7 +379,7 @@ public class Main extends JavaPlugin implements Listener{
 	World _world = Bukkit.getWorlds().get(0);
 	
 	Location redBase = new Location(_world,-460.5,68,-78.5);
-	Location redFlag = new Location(_world,-453.5,69,-78.5);
+	Location redFlag = new Location(_world,-453.5,69,-77.5);
 	Location blueBase = new Location(_world,-460.5,68,-4.5);
 	Location blueFlag = new Location(_world,-453.5,69,-4.5);
 	Location deathCamp = new Location(_world,-451.5,74,6.5);
@@ -262,6 +387,8 @@ public class Main extends JavaPlugin implements Listener{
 	//ArrayList<Location> spawnItemNodes = new ArrayList<Location>();
 	
 	void makeTeams() {
+		blueFlag.getBlock().setType(Material.BLUE_BANNER);
+		redFlag.getBlock().setType(Material.RED_BANNER);
 		int i = 0;
 		for (Player p : Bukkit.getOnlinePlayers()) {
 			
@@ -287,6 +414,12 @@ public class Main extends JavaPlugin implements Listener{
 			}
 			i++;
 		}
+	}
+	
+	public void reset() {
+		redTeam = new ArrayList<Player>();
+		blueTeam = new ArrayList<Player>();
+		isPlaying = false;
 	}
 	
 	ArrayList<Player> redTeam = new ArrayList<Player>();
@@ -315,9 +448,7 @@ public class Main extends JavaPlugin implements Listener{
 				if (isPlaying) {
 					Bukkit.broadcastMessage(ChatColor.RED + "Capture The Flag game has been stopped.");
 					player.performCommand("title @a title {\"text\":\"Stopping Game\",\"color\":\"red\"}");
-					redTeam = new ArrayList<Player>();
-					blueTeam = new ArrayList<Player>();
-					isPlaying = false;
+					reset();
 				} else {
 					player.sendMessage(ChatColor.RED + "There is not a game active right now.");
 				}
