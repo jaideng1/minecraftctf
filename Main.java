@@ -22,16 +22,19 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType.SlotType;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -104,7 +107,7 @@ public class Main extends JavaPlugin implements Listener{
 	public void onInventoryClick(InventoryClickEvent event) {
 		Player player = (Player) event.getWhoClicked();
 		if(event.getSlotType() == SlotType.ARMOR && isPlaying && isCTFPlayer(player)) {
-			event.setCancelled(true);  
+			event.setCancelled(true);
 			player.sendMessage(ChatColor.GREEN + "Keep your eyes on the prize!");
         }
 	}
@@ -115,18 +118,33 @@ public class Main extends JavaPlugin implements Listener{
 		if (event.getEntity() instanceof Player) { //Change
 			Player damaged = (Player) event.getEntity();
 			if (isPlaying && isCTFPlayer(damaged)) {
+				
 				if (getPlayerTeam(damaged) != "") {
 					damaged.sendMessage(ChatColor.RED + "You've been hit! Your health: " + Math.floor(damaged.getHealth()));
-					if (damaged.getHealth() < 1) {
-						event.setCancelled(true);
-						damaged.setHealth(20);
-						damaged.teleport(deathCamp);
-						damaged.sendMessage(ChatColor.RED + "You've been sent to JAIL!");
-					}
+					
 				} else {
 					event.setCancelled(true);
 				}
 			}
+		}
+	}
+	
+	@EventHandler
+	public void onPlayerDeath(PlayerDeathEvent event) {
+		if (isCTFPlayer(event.getEntity())) {
+			Player p = event.getEntity();
+			event.setDroppedExp(10);
+			p.getInventory().setChestplate(new ItemStack(Material.AIR));
+			p.getInventory().setHelmet(new ItemStack(Material.AIR));
+			event.setKeepInventory(false);
+			event.setKeepLevel(true);
+		}
+	}
+	
+	@EventHandler
+	public void onPlayerRespawn(PlayerRespawnEvent event) {
+		if (isCTFPlayer(event.getPlayer())) {
+			sendToDeathCamp(event.getPlayer());
 		}
 	}
 	
@@ -162,6 +180,9 @@ public class Main extends JavaPlugin implements Listener{
 		
 		if (isCTFPlayer(player)) {
 			event.setCancelled(true);
+			if (event.getBlock().getType() == Material.WHITE_WOOL) {
+				event.setCancelled(false);
+			}
 			//player.getInventory().addItem(new ItemStack(event.getBlockPlaced().getType()));
 		}
 	}
@@ -182,6 +203,9 @@ public class Main extends JavaPlugin implements Listener{
 				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"!!!\",\"color\":\"red\"}");
 			}
 			event.setCancelled(true);
+			if (event.getBlock().getType() == Material.WHITE_WOOL) {
+				event.setCancelled(false);
+			}
 		}
 	}
 	
@@ -213,6 +237,11 @@ public class Main extends JavaPlugin implements Listener{
 				Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "title @a title {\"text\":\"BLUE WON\",\"color\":\"blue\"}");
 			}
 		}
+		Location l1 = new Location(Bukkit.getWorlds().get(0), -499.5, 60, -83.5);
+		Location l2 = new Location(Bukkit.getWorlds().get(0), -413.5, 300, 2);
+		if (!isInRect(event.getPlayer(), l2, l1) && isCTFPlayer(event.getPlayer()) && !isInDeathCamp(event.getPlayer())) {
+			event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.HARM, 100, 8));
+		}
 	}
 	
 	Inventory null_shop = Bukkit.createInventory(null, 9, "Item Shop");
@@ -222,33 +251,83 @@ public class Main extends JavaPlugin implements Listener{
 		if (event.getRightClicked() instanceof Villager) {
 			if (isCTFPlayer(event.getPlayer())) {
 				event.setCancelled(true);
-				
+				ArrayList<String> lo = new ArrayList<String>();
 				ItemStack invis = new ItemStack(Material.POTION,1);
 				ItemMeta im = invis.getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 10 Kills");
+				im.setLore(lo);
 				im.setDisplayName("Invisibility (0:30)");
 				invis.setItemMeta(im);
 				
 				ItemStack strength = new ItemStack(Material.POTION,1);
 				ItemMeta sm = strength.getItemMeta();
-				im.setDisplayName("Strength (0:30)");
+				lo = new ArrayList<String>();
+				lo.add("Cost: 10 Kills");
+				sm.setLore(lo);
+				sm.setDisplayName("Strength (0:30)");
 				strength.setItemMeta(sm);
 				
 				ItemStack ench = new ItemStack(Material.ENCHANTED_BOOK,1);
 				EnchantmentStorageMeta em = (EnchantmentStorageMeta) ench.getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 10 Kills");
+				
 				em.addEnchant(Enchantment.DAMAGE_ALL, 1, false);
-				em.addEnchant(Enchantment.THORNS, 1, false);
+				em.addEnchant(Enchantment.KNOCKBACK, 1, false);
 				em.addEnchant(Enchantment.MULTISHOT, 1, false);
+				em.addEnchant(Enchantment.ARROW_DAMAGE, 1, false);
 				ench.setItemMeta(em);
+				ItemMeta en2 = ench.getItemMeta();
+				en2.setLore(lo);
+				ench.setItemMeta(en2);
+				
+				ItemMeta sw = new ItemStack(Material.STONE_SWORD,1).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 0 Kills");
+				sw.setLore(lo);
+				ItemStack sw_ = new ItemStack(Material.STONE_SWORD,1);
+				sw_.setItemMeta(sw);
+				ItemMeta si = new ItemStack(Material.IRON_SWORD,1).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 2 Kills");
+				si.setLore(lo);
+				ItemStack si_ = new ItemStack(Material.IRON_SWORD,1);
+				si_.setItemMeta(si);
+				ItemMeta bw = new ItemStack(Material.BOW,1).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 7 Kills");
+				bw.setLore(lo);
+				ItemStack bw_ = new ItemStack(Material.BOW,1);
+				bw_.setItemMeta(bw);
+				ItemMeta ar = new ItemStack(Material.ARROW,8).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 2 Kills");
+				ar.setLore(lo);
+				ItemStack ar_ = new ItemStack(Material.ARROW,8);
+				ar_.setItemMeta(ar);
+				ItemMeta ww = new ItemStack(Material.WHITE_WOOL,8).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 2 Kills");
+				ww.setLore(lo);
+				ItemStack ww_ = new ItemStack(Material.WHITE_WOOL,8);
+				ww_.setItemMeta(ww);
+				ItemMeta ep = new ItemStack(Material.ENDER_PEARL,1).getItemMeta();
+				lo = new ArrayList<String>();
+				lo.add("Cost: 8 Kills");
+				ep.setLore(lo);
+				ItemStack ep_ = new ItemStack(Material.ENDER_PEARL,1);
+				ep_.setItemMeta(ep);
 				
 				Inventory inv = Bukkit.createInventory(null, 9, "Item Shop");
-				inv.setItem(0, new ItemStack(Material.STONE_SWORD, 1));
-				inv.setItem(1, new ItemStack(Material.IRON_SWORD, 1));
-				inv.setItem(2, new ItemStack(Material.BOW, 1));
-				inv.setItem(3, new ItemStack(Material.ARROW, 8));
+				inv.setItem(0, sw_);
+				inv.setItem(1, si_);
+				inv.setItem(2, bw_);
+				inv.setItem(3, ar_);
 				inv.setItem(4, invis); // TODO change the potions + enchanted book
 				inv.setItem(5, strength); //<- invis ^strength
-				inv.setItem(6, new ItemStack(Material.WHITE_WOOL, 16));
-				inv.setItem(7, new ItemStack(Material.ENDER_PEARL, 1));
+				inv.setItem(6, ww_);
+				inv.setItem(7, ep_);
 				inv.setItem(8, ench);
 				event.getPlayer().openInventory(inv);
 			}
@@ -267,6 +346,8 @@ public class Main extends JavaPlugin implements Listener{
 		int one = inventory.getSize();
 		
 		if (two == one) {
+			
+			
 			if (clicked.getType() == Material.STONE_SWORD) {
 				event.setCancelled(true);
 				player.closeInventory();
@@ -287,16 +368,35 @@ public class Main extends JavaPlugin implements Listener{
 				player.closeInventory();
 				player.getInventory().addItem(new ItemStack(Material.ARROW, 8));
 			}
-			if (clicked.getType() == Material.POTION) {
+			if (clicked.getType() == Material.POTION && event.getSlot() == 4) {
 				event.setCancelled(true);
+				ItemStack pot = new ItemStack(Material.POTION);
+				PotionMeta pm = (PotionMeta) pot.getItemMeta();
+				pm.addCustomEffect(new PotionEffect(PotionEffectType.INVISIBILITY,600,2), true);
+				pm.setColor(Color.GRAY);
+				pm.setDisplayName(ChatColor.DARK_PURPLE + "Invisibility (0:30)");
+				ArrayList<String> lr = new ArrayList<String>();
+				lr.add(ChatColor.LIGHT_PURPLE + "Grants Invisibility for 30 seconds.");
+				lr.add(ChatColor.DARK_RED + "Removes your armour, though.");
+				pm.setLore(lr);
+				pot.setItemMeta(pm);
 				player.closeInventory();
-				player.getInventory().addItem(new ItemStack(Material.POTION, 1));
+				player.getInventory().addItem(pot);
 			}
-//			if (clicked.getType() == Material.POTION) { change for each potion
-//				event.setCancelled(true);
-//				player.closeInventory();
-//				player.getInventory().addItem(new ItemStack(Material.POTION, 1));
-//			}
+			if (clicked.getType() == Material.POTION && event.getSlot() == 5) {
+				event.setCancelled(true);
+				ItemStack pot = new ItemStack(Material.POTION);
+				PotionMeta pm = (PotionMeta) pot.getItemMeta();
+				pm.addCustomEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE,600,2), true);
+				pm.setColor(Color.ORANGE);
+				pm.setDisplayName(ChatColor.DARK_RED + "Strength II (0:30)");
+				ArrayList<String> lr = new ArrayList<String>();
+				lr.add(ChatColor.LIGHT_PURPLE + "Grants Strength II for 30 seconds.");
+				pm.setLore(lr);
+				pot.setItemMeta(pm);
+				player.closeInventory();
+				player.getInventory().addItem(pot);
+			}
 			if (clicked.getType() == Material.WHITE_WOOL) {
 				event.setCancelled(true);
 				player.closeInventory();
@@ -376,6 +476,24 @@ public class Main extends JavaPlugin implements Listener{
 		return "";
 	}
 	
+	public boolean isInDeathCamp(Player p) {
+		for (Player d : inDeathCamp) {
+			if (d.getName() == p.getName()) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public void sendToDeathCamp(Player p) {
+		
+		p.setHealth(20);
+		p.teleport(deathCamp);
+		p.sendMessage(ChatColor.RED + "You've been sent to JAIL!");
+		inDeathCamp.add(p);
+		p.sendMessage(ChatColor.RED + "To be released, work! (Move around)");
+	}
+	
 	World _world = Bukkit.getWorlds().get(0);
 	
 	Location redBase = new Location(_world,-460.5,68,-78.5);
@@ -424,6 +542,7 @@ public class Main extends JavaPlugin implements Listener{
 	
 	ArrayList<Player> redTeam = new ArrayList<Player>();
 	ArrayList<Player> blueTeam = new ArrayList<Player>();
+	ArrayList<Player> inDeathCamp = new ArrayList<Player>();
 	
 	boolean isPlaying = false;
 	int teamSize = 5;
