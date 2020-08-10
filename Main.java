@@ -59,8 +59,7 @@ public class Main extends JavaPlugin implements Listener{
 	@Override
 	public void onEnable() {
 		getLogger().info("CTF enabled, " + version);
-		getLogger().info("CTF by CBlockSurprise");
-		getLogger().info("Download the map at https://cblocksurprise.github.io");
+		getLogger().info("CTF by [name removed 8/9/2020]");
 		
 		
 		//Set colors of chestplates
