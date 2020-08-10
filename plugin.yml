@@ -2,7 +2,7 @@ name: ctf
 main: me.ctf.cblocksurprise.Main
 version: 1.0
 api-version: 1.14
-author: CBlockSurprise
+author: [removed]
 commands:
   startgame:
     description: This is for starting the game
